@@ -159,33 +159,95 @@ async fn do_query_03(connection_pool: &Option<Pool<MySql>>, query: &str) -> Resu
     }
 }
 
-fn main() {
+async fn do_query_04(connection_pool: &Option<Pool<MySql>>, query: &str) -> Result<(), Error> {
+    match connection_pool {
+        Some(connection_pool) => {
+            let mut conn = match connection_pool.acquire().await {
+                Ok(conn) => conn,
+                Err(error) => return Err(error),
+            };
 
+            let mut rows = sqlx::query(query).fetch(&mut *conn);
+
+            loop {
+                let row = match rows.try_next().await {
+                    Ok(optional) => match optional {
+                        Some(row) => row,
+                        None => {
+                            break; //No more records.
+                        }
+                    },
+                    Err(error) => {
+                        eprintln!("Error => {:?}", error);
+                        return Err(error);
+                    }
+                };
+
+                let id: &str = row.try_get("Id")?;
+                let name: &str = row.try_get("Name")?;
+                println!("id: {}, name: {}", id, name);
+            }
+
+            // while let Some(row) = rows.try_next().await? {
+            //     // map the row into a user-defined domain type
+            //     let id: &str = row.try_get("Id")?;
+            //     let name: &str = row.try_get("Name")?;
+            //     println!("id: {}, name: {}", id, name);
+            // }
+
+            Ok(())
+        }
+        None => {
+            //println!( "No connection pool provided" );
+            //Err( //std::io::Error::new( std::io::ErrorKind::NotConnected, "No connection pool provided" ) )
+            Err(Error::PoolClosed)
+        }
+    }
+}
+
+fn main() {
     println!("My pid is {}", process::id());
 
     let mut line = String::new();
-    println!( "Press any key to continue" );
-    std::io::stdin().read_line(&mut line).expect("Failed to read line");
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
 
     let connection_pool = task::block_on(do_test_connection());
 
-    println!( "Press any key to continue" );
-    std::io::stdin().read_line(&mut line).expect("Failed to read line");
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
 
     let _ = task::block_on(do_query_01(&connection_pool, "Select * From sysUserGroup"));
 
-    println!( "Press any key to continue" );
-    std::io::stdin().read_line(&mut line).expect("Failed to read line");
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
 
     let _ = task::block_on(do_query_02(&connection_pool, "Select * From sysUserGroup"));
 
-    println!( "Press any key to continue" );
-    std::io::stdin().read_line(&mut line).expect("Failed to read line");
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
 
     let _ = task::block_on(do_query_03(&connection_pool, "Select * From sysUserGroup"));
 
-    println!( "Press any key to continue" );
-    std::io::stdin().read_line(&mut line).expect("Failed to read line");
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
+
+    let _ = task::block_on(do_query_04(&connection_pool, "Select * From sysUserGroup1"));
+
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
 
     // match connection_pool {
     //     Some(connection_pool) => {}
