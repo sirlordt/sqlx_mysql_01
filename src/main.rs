@@ -6,9 +6,15 @@ use async_std::task;
 
 use futures::TryStreamExt;
 
-use sqlx::Row;
+//use sqlx::Row;
+
+use sqlx::{Column, Row, TypeInfo};
 
 use std::process;
+
+use serde_json::json;
+
+use std::collections::HashMap;
 
 async fn connect() -> Result<Pool<MySql>, Error> {
     //return MySqlPool::connect("mysql://root:dsistemas@localhost:3306/Test01DB").await;
@@ -89,6 +95,11 @@ async fn do_query_01(connection_pool: &Option<Pool<MySql>>, query: &str) -> Resu
             println!("Number Of User Group Selected: {}", query_result.len());
 
             for (rindex, row) in query_result.iter().enumerate() {
+                for (cindex, column) in row.columns().iter().enumerate() {
+                    println!("Col Name => {}", column.name());
+                    println!("Col Index => {}", column.ordinal());
+                }
+
                 let x: String = row.get(0);
 
                 println!("Row Index => {}", rindex);
@@ -205,6 +216,76 @@ async fn do_query_04(connection_pool: &Option<Pool<MySql>>, query: &str) -> Resu
     }
 }
 
+async fn do_query_05(connection_pool: &Option<Pool<MySql>>, query: &str) -> Result<(), Error> {
+    match connection_pool {
+        Some(connection_pool) => {
+            let result: Vec<_> = sqlx::query(query)
+                .fetch_all(connection_pool)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|row| {
+                    json!(row
+                        .columns()
+                        .into_iter()
+                        .map(|column| {
+                            //row.get
+                            let ordinal = column.ordinal();
+                            let type_name = column.type_info().name();
+                            (
+                                column.name(),
+                                match type_name {
+                                    "TEXT" | "VARCHAR" | "JSON" => {
+                                         //println!("{:?}",row.get::<Option<String>, _>(ordinal));
+                                         json!(row.get::<Option<String>, _>(ordinal))
+                                     },
+                                    "INTEGER" => json!(row.get::<Option<i64>, _>(ordinal)),
+                                    "BOOLEAN" => json!(row.get::<Option<bool>, _>(ordinal)),
+                                    "REAL" => json!(row.get::<Option<f64>, _>(ordinal)),
+                                    // probably missed a few other types?
+                                    _ => {
+                                        json!(format!("UNPROCESSED TYPE '{}'", type_name))
+                                    }
+                                },
+                            )
+                        })
+                        .collect::<HashMap<_, _>>())
+                })
+                .collect();
+
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+
+            // let query_result = sqlx::query("Select * From sysUserGroup")
+            //     .fetch_all(&connection_pool)
+            //     .await?;
+
+            // println!("Number Of User Group Selected: {}", query_result.len());
+
+            // for (rindex, row) in query_result.iter().enumerate() {
+
+            //     for ( cindex,column) in row.columns().iter().enumerate() {
+
+            //         println!("Col Name => {}", column.name() );
+            //         println!("Col Index => {}", column.ordinal() );
+
+            //     }
+
+            //     let x: String = row.get(0);
+
+            //     println!("Row Index => {}", rindex);
+            //     println!("Name => {}", x);
+            // }
+
+            Ok(())
+        }
+        None => {
+            //println!( "No connection pool provided" );
+            //Err( //std::io::Error::new( std::io::ErrorKind::NotConnected, "No connection pool provided" ) )
+            Err(Error::PoolClosed)
+        }
+    }
+}
+
 fn main() {
     println!("My pid is {}", process::id());
 
@@ -215,6 +296,13 @@ fn main() {
         .expect("Failed to read line");
 
     let connection_pool = task::block_on(do_test_connection());
+
+    println!("Press any key to continue");
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("Failed to read line");
+
+    let _ = task::block_on(do_query_05(&connection_pool, "Select * From sysUserGroup Where Id = '040de405-872f-4a4f-a085-c494a76ed03b'"));
 
     println!("Press any key to continue");
     std::io::stdin()
