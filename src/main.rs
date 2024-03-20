@@ -479,78 +479,6 @@ async fn do_query_07(
             let mut rows = sqlx::query(query).fetch(real_conn);
 
             apply_transaction = process_data(&mut rows);
-
-            /*
-            loop {
-                let row = match rows.try_next().await {
-                    Ok(optional) => match optional {
-                        Some(row) => row,
-                        None => {
-                            break; //No more records.
-                        }
-                    },
-                    Err(error) => {
-                        //println!("Error => {:?}", error);
-                        apply_transaction = false;
-                        local_error = Some(error);
-                        //return Err(error);
-                        break;
-                    }
-                };
-
-                ////let mut data: HashMap<String, serde_json::Value> = HashMap::new();
-
-                // for column in row.columns().iter() {
-                //     let ordinal = column.ordinal();
-                //     let type_name = column.type_info().name();
-
-                //     data.insert(
-                //         column.name().to_string(),
-                //         match type_name {
-                //             "TEXT" | "VARCHAR" | "JSON" | "CHAR" => {
-                //                 json!(row.get::<Option<String>, _>(ordinal))
-                //             }
-                //             "INTEGER" => json!(row.get::<Option<i64>, _>(ordinal)),
-                //             "BOOLEAN" => json!(row.get::<Option<bool>, _>(ordinal)),
-                //             "REAL" => json!(row.get::<Option<f64>, _>(ordinal)),
-                //             // probably missed a few other types?
-                //             _ => {
-                //                 json!(format!("UNPROCESSED TYPE '{}'", type_name))
-                //             }
-                //         },
-                //     );
-                // }
-
-                let data = row
-                    .columns()
-                    .into_iter()
-                    .map(|column| {
-                        //row.get
-                        let ordinal = column.ordinal();
-                        let type_name = column.type_info().name();
-                        (
-                            column.name().to_string(),
-                            match type_name {
-                                "TEXT" | "VARCHAR" | "JSON" | "CHAR" => {
-                                    json!(row.get::<Option<String>, _>(ordinal))
-                                }
-                                "INTEGER" => json!(row.get::<Option<i64>, _>(ordinal)),
-                                "BOOLEAN" => json!(row.get::<Option<bool>, _>(ordinal)),
-                                "REAL" => json!(row.get::<Option<f64>, _>(ordinal)),
-                                // probably missed a few other types?
-                                _ => {
-                                    json!(format!("UNPROCESSED TYPE '{}'", type_name))
-                                }
-                            },
-                        )
-                            .to_owned()
-                    })
-                    .collect::<HashMap<_, _>>();
-
-                result_data.push(data);
-                //println!("{}", serde_json::to_string_pretty(&data).unwrap());
-            }
-            */
         }
 
         if apply_transaction {
@@ -561,83 +489,12 @@ async fn do_query_07(
             //my_other.as_ref().into_inner().rollback().await?;
         }
     } else {
-        let local_transaction = transaction.unwrap(); //Rc::new( RefCell::new( transaction.unwrap() ) );
+        let local_transaction = transaction.unwrap();
 
         let mut rows = sqlx::query(query).fetch(&mut **local_transaction);
 
         process_data(&mut rows);
-
-        /*
-        loop {
-            let row = match rows.try_next().await {
-                Ok(optional) => match optional {
-                    Some(row) => row,
-                    None => {
-                        break; //No more records.
-                    }
-                },
-                Err(error) => {
-                    local_error = Some(error);
-                    break;
-                }
-            };
-
-            ////let mut data: HashMap<String, serde_json::Value> = HashMap::new();
-
-            // for column in row.columns().iter() {
-            //     let ordinal = column.ordinal();
-            //     let type_name = column.type_info().name();
-
-            //     data.insert(
-            //         column.name().to_string(),
-            //         match type_name {
-            //             "TEXT" | "VARCHAR" | "JSON" | "CHAR" => {
-            //                 json!(row.get::<Option<String>, _>(ordinal))
-            //             }
-            //             "INTEGER" => json!(row.get::<Option<i64>, _>(ordinal)),
-            //             "BOOLEAN" => json!(row.get::<Option<bool>, _>(ordinal)),
-            //             "REAL" => json!(row.get::<Option<f64>, _>(ordinal)),
-            //             // probably missed a few other types?
-            //             _ => {
-            //                 json!(format!("UNPROCESSED TYPE '{}'", type_name))
-            //             }
-            //         },
-            //     );
-            // }
-
-            let data = row
-                .columns()
-                .into_iter()
-                .map(|column| {
-                    //row.get
-                    let ordinal = column.ordinal();
-                    let type_name = column.type_info().name();
-                    (
-                        column.name().to_string(),
-                        match type_name {
-                            "TEXT" | "VARCHAR" | "JSON" | "CHAR" => {
-                                json!(row.get::<Option<String>, _>(ordinal))
-                            }
-                            "INTEGER" => json!(row.get::<Option<i64>, _>(ordinal)),
-                            "BOOLEAN" => json!(row.get::<Option<bool>, _>(ordinal)),
-                            "REAL" => json!(row.get::<Option<f64>, _>(ordinal)),
-                            // probably missed a few other types?
-                            _ => {
-                                json!(format!("UNPROCESSED TYPE '{}'", type_name))
-                            }
-                        },
-                    )
-                        .to_owned()
-                })
-                .collect::<HashMap<_, _>>();
-
-            result_data.push(data);
-            //println!("{}", serde_json::to_string_pretty(&data).unwrap());
-        }
-        */
     }
-
-    //current_transaction.commit();
 
     if local_error.is_some() {
         return Err(local_error.unwrap());
